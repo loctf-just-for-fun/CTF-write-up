@@ -1,1 +1,23 @@
-https://humdrum-beanie-d4b.notion.site/WPwnerD-write_up-collection-5cdc64ea369a4495ab5cd109cd24c275
++ my own write-up
+https://humdrum-beanie-d4b.notion.site/WPwnerD-write_up-collection-5cdc64ea369a4495ab5cd109cd24c27
+
++ my old sensei write-up 
+https://hackmd.io/@onsra03/rkK7hsrl2
+
++ random senior sec write-up
+https://nguyendt.hashnode.dev/pbctf-2023-writeup
+https://github.com/w181496/Web-CTF-Cheatsheet
+https://w4rsp1t3.moe/2021/11/26/关于利用pearcmd进行文件包含的一些总结/
+https://viblo.asia/p/php-magic-ctf-writeups-gwd43kpK4X9
+https://hackmd.io/@devme4f/B1YGfYv7n
+https://inseclab.uit.edu.vn/wannashare-writeups-ctf-cookie-arena-season-1-2021-web-crypto-programming-network-forensics/
+https://hackmd.io/@Dat2Phit
+https://guyinatuxedo.github.io/00-intro/index.html
+https://mrskeltal.com/categories/securityvalley/
+https://alsolaiman.medium.com/a-deep-dive-into-iframe-src-attribute-leading-to-a-stored-xss-f191c3c67749
+https://viblo.asia/p/server-side-template-injection-vulnerabilities-ssti-cac-lo-hong-ssti-phan-3-Ny0VGjAYLPA
+https://0xinfection.github.io/reversing/
+https://www.assetnote.io/resources/research/digging-for-ssrf-in-nextjs-apps
+https://www.cyberdonald.com/post/downunderctf-web-co2
+https://siunam321.github.io/ctf/
+https://github.com/project-sekai-ctf/sekaictf-2024
