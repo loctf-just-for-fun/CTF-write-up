@@ -21,3 +21,7 @@ https://www.assetnote.io/resources/research/digging-for-ssrf-in-nextjs-apps
 https://www.cyberdonald.com/post/downunderctf-web-co2
 https://siunam321.github.io/ctf/
 https://github.com/project-sekai-ctf/sekaictf-2024
+https://hackmd.io/@Solderet/HJ52F9496?utm_source=preview-mode&utm_medium=rec
+https://kcsc.edu.vn/tetctf-2024-write-up?fbclid=IwAR0CcqUy4lCECVa7CDpNq-rSNgGEBjn0ll4ucObjlwvksiOCVuz9ubB2i0g
+https://github.com/D13David/ctf-writeups/blob/main/pearlctf24/web/web_noob/README.md
+
