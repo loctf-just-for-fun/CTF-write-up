@@ -119,5 +119,4 @@ http://96f8-100-53-180-110.ngrok.io\\@i.ibb.co/#b\\a.jpg
 trong đó '#' để bypass file extension (khi hàm check thì thấy có .jpg -> pass nhưng khi thực hiện thì thấy có # nên loại bỏ phần url sau đi => vẫn thực hiện được đầy đủ chức năng )
 khi sử dụng payload , nodejs với URLParse sẽ nhận diện url là i.ibb.co => qua đc hàm bypass trong khi bot nhận diện là 96f8-100-53-180-110.ngrok.io
 
-bot sẽ truy cập vào trong attacker host (..-110.ngrok.io)và attacker host sẽ redirect đến "file:///usr/src/app/fl4gg_tetCTF#lol.jpg" ==> lấy đc flag 
-
+bot sẽ truy cập vào trong attacker host (..-110.ngrok.io)và attacker host sẽ redirect đến "file:///usr/src/app/fl4gg_tetCTF#lol.jpg" (cái mà chúng ta k thể khiến bot truy cập do bị filter http/https với tên host) ==> lấy đc flag 
