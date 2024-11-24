@@ -58,6 +58,5 @@ vào hàm thực tế thì flag[-~0+-~5] <=> flag[6]
 
 (đồng thời các kí tự đó cũng nằm trong khoảng cho phép của hàm check nên ok)
 
-payloads exploit
-![alt text](https://i.ytimg.com/vi/vYeDZvhWDO0/sddefault.jpg)
+payloads exploit: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(710).png
 '''
