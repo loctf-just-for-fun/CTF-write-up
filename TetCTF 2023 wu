@@ -46,8 +46,10 @@ if request.method == 'POST':
                     if len("%s[%s]" % (greetType, greetNumber)) > 20:
                         greeting = fail
                     else:
-                        greeting = eval("%s[%s]" % (greetType, greetNumber)) # đây nhận diện là 1 lỗ hổng : thay vì cho mặc định để lấy 1 item trong mấy cái list trên đầu thì mình có thể lấy TỪNG KÍ TỰ TRONG 1 BIẾN STRING  
-                                                                             # cụ thể là flag[0] , flag[1] , ...
+                        greeting = eval("%s[%s]" % (greetType, greetNumber)) 
+# hàm eval() sẽ thực thi , đánh giá và thực thi một biểu thức Python được truyền dưới dạng chuỗi (vd string1="CTF" thì eval("string1[0]") = 'C' , nó lấy giá trị biến như trong console)
+# đây nhận diện là 1 lỗ hổng : thay vì cho mặc định để lấy 1 item trong mấy cái list trên đầu thì mình có thể lấy TỪNG KÍ TỰ TRONG 1 BIẾN STRING  
+# cụ thể là flag[0] , flag[1] , ...
 '''
 + để bypass hàm check index thì ta dùng các kí tự ~ , - 
 quy tắc:  ~x = -(x+1) => -~x = x+1 
