@@ -1,0 +1,63 @@
+___________________________________________________________________________________________________New year bot_____________________________________________________________________________________________________
+
+chall : sử dụng kí tự '-' '~' để bypass hàm check giới hạn value 
+
+phân tích source như sau:
+
+list1=["1","2","3","4"]
+list2=["5","1","2","3","4"]
+list3=["1","2","3"]
+list4=["1","2","3","4","5","6"]
+alls=["list1","list2","list3","list4"]
+flag="ctf_12344567890" # đây là nơi chứa flag
+# tên các list và tên chứa biến flag tuy khác nhau ( alls tương đương với NewYearCategoryList , list1 với NewYearCommonList )nhưng ý tưởng khai thác vẫn vậy 
+
+  def botValidator(s):
+
+    #kiểm tra xem input có phải kí tự trong khoảng 57 -> 123 không
+    for c in s:
+        if (57 < ord(c) < 123):
+            return False
+              
+    # hàm check xem số này có phải index hợp lệ của 1 trong các list đã cho hay không 
+    n = "".join(x for x in re.findall(r'\d+', s)) # hàm lấy các chữ số có trong input string mình đưa vô , vd: 234*213 thì sẽ lấy các kí tự số ra -> 234213 
+    if n.isnumeric():
+        ev = "max("
+        for gl in alls:
+            ev += "len(%s)," % gl
+        l = eval(ev[:-1] + ")") # chỗ này ghép thành 1 câu lệnh max(len(list1) ,len(list2) ,.. ) để tìm độ lớn nhất của list trong  list1 , list2
+        print(n)
+        if int(n) > (l - 1): # -1 vì len(list) -1 là ra thứ tự index cuối của list đó
+            return False
+    return True
+
+  
+debug = request.args.get("debug")
+if request.method == 'POST':
+    greetType = request.form["type"]
+    greetNumber = request.form["number"]
+    if greetType == "greeting_all":
+        greeting = random_greet(random.choice(NewYearCategoryList))
+    else:
+        try:
+            if greetType != None and greetNumber != None:
+                greetNumber = re.sub(r'\s+', '', greetNumber) # xoá khoảng trắng trong input greetNumber
+                if greetType.isidentifier() == True and botValidator(greetNumber) == True: # check xem có rỗng hay không và check xem số này có phải index hợp lệ của 1 trong các list đã cho hay không 
+                    if len("%s[%s]" % (greetType, greetNumber)) > 20:
+                        greeting = fail
+                    else:
+                        greeting = eval("%s[%s]" % (greetType, greetNumber)) # đây nhận diện là 1 lỗ hổng : thay vì cho mặc định để lấy 1 item trong mấy cái list trên đầu thì mình có thể lấy TỪNG KÍ TỰ TRONG 1 BIẾN STRING  
+                                                                             # cụ thể là flag[0] , flag[1] , ...
+'''
++ để bypass hàm check index thì ta dùng các kí tự ~ , - 
+quy tắc:  ~x = -(x+1) => -~x = x+1 
+vd : khi ta dùng các kí tự này thì với -~5 = 6 , -~0+-~5 = 7
+
+sử dụng những kí tự 0 , 5  thì sau khi lấy những kí tự số từ input (vd như -~0+-~5), nó sẽ có dạng tương tự như là 05 (giải thích vì sao phải dùng kí tự 0 đằng trc) , convert ra int là 5 , là 1 index hợp lệ => bypass hàm kiểm tra index nhưng thực tế thì khi đưa 
+vào hàm thực tế thì flag[-~0+-~5] <=> flag[6] 
+
+(đồng thời các kí tự đó cũng nằm trong khoảng cho phép của hàm check nên ok)
+
+payloads exploit
+![alt text](https://i.ytimg.com/vi/vYeDZvhWDO0/sddefault.jpg)
+'''
