@@ -1,0 +1,81 @@
+link all chall: https://github.com/dicegang/dicectf-quals-2024-challenges
+
+chall :dicedicegoose
+
+
+    let nxt = [player[0], player[1]];
+# hàm ghi lại nước đi của người chơi
+    switch (e.key) {
+      case "w":
+        nxt[0]--;
+        break;
+      case "a":
+        nxt[1]--;
+        break;
+      case "s":
+        nxt[0]++;
+        break;
+      case "d":
+        nxt[1]++;
+        break;
+    }
+
+    if (!isValid(nxt)) return;
+
+    player = nxt;
+    if (player[0] === goose[0] && player[1] === goose[1]) {
+      win(history);
+      won = true;
+      return;
+    }
+# hàm ghi lại nước đi của máy (ngẫu nhiên)
+    do {
+      nxt = [goose[0], goose[1]];
+      switch (Math.floor(4 * Math.random())) {
+        case 0:
+          nxt[0]--;
+          break;
+        case 1:
+          nxt[1]--;
+          break;
+        case 2:
+          nxt[0]++;
+          break;
+        case 3:
+          nxt[1]++;
+          break;
+      }
+    } while (!isValid(nxt));
+
+    goose = nxt;
+
+    history.push([player, goose]);
+
+    redraw();
+  };
+...
+  function win(history) {
+    const code = encode(history) + ";" + prompt("Name?");
+
+    const saveURL = location.origin + "?code=" + code;
+    displaywrapper.classList.remove("hidden");
+
+    const score = history.length;
+
+    display.children[1].innerHTML = "Your score was: <b>" + score + "</b>";
+    display.children[2].href =
+      "https://twitter.com/intent/tweet?text=" +
+      encodeURIComponent(
+        "Can you beat my score of " + score + " in Dice Dice Goose?",
+      ) +
+      "&url=" +
+      encodeURIComponent(saveURL);
+
+    if (score === 9) log("flag: dice{pr0_duck_gam3r_" + encode(history) + "}");
+
+
+explain : cho 1 web , trong đó có 1 con xúc sắc và 1 cái con trỏ(cái người dùng có thể di chuyển) , xúc sắc di chuyển ngẫu nhiên , sẽ có 1 hàm lưu history của các move và sẽ cho qua các hàm check , nếu mà toạ độ 2 move == nhau thì có flag
+
+explot : 
+để ý history có thể thay đổi đc nên ta có thể tạo 1 history giả chứa các move của người chơi và move của máy r cho chạy vô hàm check và lấy flag(vì trình debug có thể thoải mái chỉnh sửa các biến js chạy trên web)
+payload : https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(725).png
