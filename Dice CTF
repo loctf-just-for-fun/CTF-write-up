@@ -1,6 +1,6 @@
 link all chall: https://github.com/dicegang/dicectf-quals-2024-challenges
 link chall gốc: https://www.youtube.com/watch?v=CGbPWSVm99k
-chall :dicedicegoose
+* chall :dicedicegoose
 
 
     let nxt = [player[0], player[1]];
@@ -79,3 +79,10 @@ explain : cho 1 web , trong đó có 1 con xúc sắc và 1 cái con trỏ(cái 
 explot : 
 để ý history có thể thay đổi đc nên ta có thể tạo 1 history giả chứa các move của người chơi và move của máy r cho chạy vô hàm check và lấy flag(vì trình debug có thể thoải mái chỉnh sửa các biến js chạy trên web)
 payload : https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(725).png
+
+* chall funnylogin
+
+exploit : 
+có isAdmin["__proto__"] == isAdmin["id_12121232"]
+và sql injection để bypass hàm users[id] với ' or 1=1 and id > 1-- (để pick bừa 1 cái userid trong tập các user cho cái users[id_ta_pick] return true)
+==> bypasss success
