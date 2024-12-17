@@ -1,0 +1,13 @@
+bài login-as admin :
+- scan qua phát hiện thấy user-input tài khoản và mật khẩu không được lọc mà đưa thẳng vào bên trong hàm chạy sql => sql injection nhưng mà hàm đầu ra lại kiểm tra output command check sql == input mật khẩu đầu vào 
+để k mất thời gian => dùng sqlmap 
+--forms : test injection trên form đăng nhập (khi mà không có paramenter trên url)
+--batch : để input mặc định k chỉnh sửa gì cả
+--ignore-code-401 : loại bỏ những response trả về lỗi k thể chứng thực user (cái mà k có tác dụng gì trong việc injection)
+--technique=T : "T" là kĩ thuật dựa trên time-base sql blind injection 
+--dump : lấy data từ bảng ra
+-T <tên bảng> -C <tên cột> : dump data tại bảng <tên bảng> ở cột <tên cột>
+
+b1. chạy câu lệnh khi chưa có flag --technique , --dump , -T , -C để sqlmap tìm kiếm xem có những kiểu lỗ hổng nào đang tồn tại
+b2. sau khi thấy những lỗ hổng có trong output của câu lệnh vừa rồi thì chọn giá trị của flag technique cho hợp lý (vd như sql liên quan đến time-base thì phải dùng flag T) có thể dùng thêm flag --dump -T <tên bảng> -C <tên cột>  để tối ưu hoá thời gian tìm kiếm dữ liệu , tránh mất nhiều thời gian search cả csdl
+payload: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(752).png
