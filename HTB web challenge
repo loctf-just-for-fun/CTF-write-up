@@ -262,7 +262,8 @@ app.get("/search", async (req, res) => {
 ==> sql injection
 tuy vậy , ta cần chú ý đến 
 1. phải encoding payload trc khi gửi,nếu k thì có thể sẽ gặp trường hợp ntn:
-ảnh: 
+ảnh: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(157).png
+https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/Screenshot%20(158).png
  (do việc encoding các kí tự đặc biệt k chuẩn nên server-side k thể url decode đúng ra kí tự đó đc ->làm sai mục đích của payload)
 
 2. chú ý đến số cột được xuất ra mặc định khi ghép kết quả của 2 câu lệnh truy vấn (sử dụng union)để xuất ra cho phù hợp , tránh thừa thiếu cột dẫn đến việc lỗi
