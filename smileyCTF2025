@@ -1,3 +1,5 @@
+inspirated by wu: https://jp0x1.github.io/blog/smileyctf/
+
 Sculpture Revenge:
     we have a xss bot and a page which can execute python code in js (using skulpt)
     when we scan the source , we see this:
